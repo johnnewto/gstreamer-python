@@ -530,7 +530,9 @@ class GstVideoSource(GstPipeline):
         >>>
     """
 
-    def __init__(self, command: str, leaky: bool = False, max_buffers_size: int = 100):
+    def __init__(self, command: str, # Gst_launch string
+                 leaky: bool = False, # If True -> use LeakyQueue
+                 max_buffers_size: int = 100): # Max queue size
         """
         :param command: gst-launch-1.0 command (last element: appsink)
         """
@@ -615,7 +617,6 @@ class GstVideoSource(GstPipeline):
         if isinstance(sample, Gst.Sample):
             self._queue.put(self._extract_buffer(sample))
             self._counter += 1
-
             return Gst.FlowReturn.OK
 
         self.log.error(
@@ -649,3 +650,21 @@ class GstVideoSource(GstPipeline):
         super().shutdown(timeout=timeout, eos=eos)
 
         self._clean_queue(self._queue)
+
+
+class GstVidSrcValve(GstVideoSource):
+    """
+    GstVideoSourceValve is a wrapper around a GStreamer pipeline that provides get and set methods for valve states.
+    """
+    def set_valve_state(self, valve_name:str, # Name of the valve in the pipeline
+                        dropstate:bool): # True = drop, False = pass
+        """ Set the state of a valve in the pipeline"""
+        valve = self.pipeline.get_by_name(valve_name)
+        valve.set_property("drop", dropstate)
+        self.dropstate = dropstate
+        self.log.info(f'Valve {valve_name} state set to {dropstate}')
+
+    def get_valve_state(self, valve_name:str): # Name of the valve in the pipeline
+        """ Get the state of a valve in the pipeline"""
+        valve = self.pipeline.get_by_name(valve_name)
+        return valve.get_property("drop")

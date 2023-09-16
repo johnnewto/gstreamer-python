@@ -5,7 +5,7 @@ import threading
 from gstreamer import GstVideoSource, GstVideoSink, GstVideo, Gst, GLib, GstContext
 
 WIDTH, HEIGHT, CHANNELS = 640, 480, 3
-NUM_BUFFERS = 1000
+NUM_BUFFERS = 2000
 VIDEO_FORMAT = GstVideo.VideoFormat.RGB
 
 video_format_str = GstVideo.VideoFormat.to_string(VIDEO_FORMAT)
@@ -21,6 +21,7 @@ dvr_cmd = "appsrc emit-signals=True is-live=True ! videoconvert ! x264enc tune=z
 
 NUM_VIDEO_FILES = 2
 NUM_FRAMES_PER_VIDEO_FILE = NUM_BUFFERS // NUM_VIDEO_FILES
+
 with GstContext(), GstVideoSource(capture_cmd) as capture:
 
     idx_video_file, num_read = 0, -1

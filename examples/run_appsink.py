@@ -33,7 +33,7 @@ def extract_buffer(sample: Gst.Sample) -> np.ndarray:
 
     buffer = sample.get_buffer()  # Gst.Buffer
 
-    print("timestamp: ", Gst.TIME_ARGS(buffer.pts), "offset: ", buffer.offset)
+    # print("timestamp: ", Gst.TIME_ARGS(buffer.pts), "offset: ", buffer.offset)
 
     caps_format = sample.get_caps().get_structure(0)  # Gst.Structure
 
@@ -60,6 +60,9 @@ def on_buffer(sink: GstApp.AppSink, data: typ.Any) -> Gst.FlowReturn:
     # https://lazka.github.io/pgi-docs/GstApp-1.0/classes/AppSink.html#GstApp.AppSink.signals.pull_sample
 
     sample = sink.emit("pull-sample")  # Gst.Sample
+
+
+    pipeline.log.info("Received sample: {}".format(sample))
 
     if isinstance(sample, Gst.Sample):
         array = extract_buffer(sample)
