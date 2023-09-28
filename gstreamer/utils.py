@@ -69,6 +69,13 @@ def fraction_to_str(fraction: Fraction) -> str:
     return '{}/{}'.format(fraction.numerator, fraction.denominator)
 
 
+def fstringify(s, **kwargs):
+    """Converts string to f-string
+        print( fstringify('video/x-raw,width={width},height={height}', height=480, width=640) )
+    """
+    return eval(f"f{s!r}", kwargs)
+
+
 def gst_state_to_str(state: Gst.State) -> str:
     """Converts Gst.State to str representation
 
@@ -147,7 +154,10 @@ def flatten_list(in_list: typ.List) -> typ.List:
 
 def to_gst_string(plugins: typ.List[str]) -> str:
     """ Generates string representation from list of plugins """
-
+    for pl in plugins:
+        if not isinstance(pl, str):
+            raise ValueError("Each plugin must be string")
+    # plugins = [str(pl) for pl in plugins]   # convert "f'{var}'" to "var"
     if len(plugins) < 2:
         return ""
 
@@ -155,3 +165,10 @@ def to_gst_string(plugins: typ.List[str]) -> str:
 
     # <!> between plugins (except tee)
     return plugins_[0] + "".join(["{} {}".format('' if pl[-1] == '.' else ' !', pl) for pl in plugins_[1:]])
+
+
+def set_gst_debug_level(level:Gst.DebugLevel = Gst.DebugLevel.FIXME):
+    # Enable GStreamer debugging. Level can be from 0 to 10.
+    # Setting it to 5 will print all gstreamer debug information.
+    Gst.debug_set_active(False) if level == Gst.DebugLevel.NONE else Gst.debug_set_active(True)
+    Gst.debug_set_default_threshold(level)

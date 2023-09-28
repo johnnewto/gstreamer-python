@@ -59,6 +59,7 @@ width, height, num_buffers = 1920, 1080, 40
 # command = 'videotestsrc num-buffers={} ! {} ! appsink emit-signals=True sync=true'.format(
 #     num_buffers, caps_filter)
 with GstVidSrcValve(command, leaky=True) as pipeline:
+    pipeline.log.error("Error")
     buffers = []
     count = 0
     dropstate = False

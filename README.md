@@ -25,8 +25,8 @@ pip install --upgrade --requirement requirements.txt
 #### pip-package
 ```bash
 
-pip install git+https://github.com/jackersson/gstreamer-python.git@{tag_name}#egg=gstreamer-python
-
+pip install git+https://github.com/johnnewto/gstreamer-python.git@{tag_name}#egg=gstreamer-python
+> pip install git+https://github.com/jackersson/gstreamer-python.git@{tag_name}#egg=gstreamer-python
 ### to skip ./build-gst-python.sh
 pip install . -v --install-option "build_py" --install-option "--skip-gst-python"
 
