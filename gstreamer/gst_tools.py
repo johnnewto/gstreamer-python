@@ -141,7 +141,7 @@ class GstPipeline:
 
         self._log = logging.getLogger("pygst.{}".format(self.__class__.__name__))
         self._log.setLevel(int(loglevel))
-        self._log.info("%s \n gst-launch-1.0 %s", self, command)
+
 
         self._end_stream_event = threading.Event()
 
@@ -203,6 +203,7 @@ class GstPipeline:
 
     def startup(self):
         """ Starts pipeline """
+
         if self._pipeline:
             raise RuntimeError("Can't initiate %s. Already started")
 
@@ -211,15 +212,17 @@ class GstPipeline:
         # Initialize Bus
         self._bus = self._pipeline.get_bus()
         self._bus.add_signal_watch()
+
         self.bus.connect("message::error", self.on_error)
         self.bus.connect("message::eos", self.on_eos)
         self.bus.connect("message::warning", self.on_warning)
+
 
         # Initalize Pipeline
         self._on_pipeline_init()
         self._pipeline.set_state(Gst.State.READY)
 
-        self.log.info("Starting %s", self)
+        self.log.info(f"Starting {self}: {self._command}")
 
         self._end_stream_event.clear()
 
@@ -298,11 +301,11 @@ class GstPipeline:
             - EOS event necessary for FILESINK finishes properly
             - Use when pipeline crushes
         """
-        self.log.info("%s Shutdown requested ...", self)
+        # self.log.info("%s Shutdown requested ...", self)
 
         self._shutdown_pipeline(timeout=timeout, eos=eos)
 
-        self.log.info("%s successfully destroyed", self)
+        self.log.info("%s Shutdown", self)
 
     @property
     def is_active(self) -> bool:
@@ -318,12 +321,13 @@ class GstPipeline:
         self._shutdown_pipeline()
 
     def on_eos(self, bus: Gst.Bus, message: Gst.Message):
-        self.log.info("Gstreamer.%s: Received stream EOS event..., shutting down pipeline", self)
+        self.log.debug("Gstreamer.%s: Received stream EOS event..., shutting down pipeline", self)
         self._shutdown_pipeline()
 
     def on_warning(self, bus: Gst.Bus, message: Gst.Message):
         warn, debug = message.parse_warning()
         self.log.warning("Gstreamer.%s: %s. %s", self, warn, debug)
+
 
 
 def gst_video_format_plugin(
@@ -800,19 +804,14 @@ class GstJpegEnc(GstVideoSource ):
 
         if command is None:
             command = to_gst_string([
-                                # # 'intervideosrc channel=channel_1  ',
-                                #  'videotestsrc pattern=ball',
-                                #  # 'videoconvert',
-                                #  # f'videoscale ! video/x-raw,width={width},height={height},framerate={fps}/1',
-                                #  # 'jpegenc',   # Quality of encoding, default is 85
-                                #  "videoconvert ! videorate drop-only=true ! video/x-raw,framerate=10/1,format=(string)BGR",
-                                #  "videologlevelconvert ! appsink name=mysink emit-signals=true  sync=false async=false  max-buffers=2 drop=true ",
-                                #  # 'appsink name=mysink emit-signals=True max-buffers=1 drop=True',
-            "videotestsrc num-buffers=100",
-            "capsfilter caps=video/x-raw,format=GRAY16_LE,width=640,height=480",
-            "queue",
-            "appsink emit-signals=True"
-                                 ])
+                'intervideosrc channel=channel_1  ',
+                # 'videotestsrc pattern=ball num-buffers={num_buffers}',
+                'videoconvert ! videoscale ! video/x-raw,width=640,height=480,framerate=10/1',
+                'queue',
+                'jpegenc quality=85',  # Quality of encoding, default is 85
+                # "queue",
+                'appsink name=mysink emit-signals=True max-buffers=1 drop=True',
+            ])
         super().__init__(command, loglevel=loglevel)
         # self._end_jpeg_capture_event = threading.Event()
 
@@ -933,7 +932,7 @@ class GstStreamUDP(GstPipeline ):
             time.sleep(0.1)
 
 
-        self.log.info('Sending EOS event, to trigger shutdown of pipeline')
+        self.log.debug('Sending EOS event, to trigger shutdown of pipeline')
         self.pipeline.send_event(Gst.Event.new_eos())
 
 
@@ -942,4 +941,97 @@ class GstStreamUDP(GstPipeline ):
         # self.pipe.pipeline.send_event(Gst.Event.new_eos())
         self._thread.join(timeout=1)
         super().shutdown(timeout=timeout, eos=eos)
-        # self.log.info(f'Video saved to {self.filename}')
+
+class GstXvimageSink(GstPipeline ):
+    """Gstreamer H264, H265  receive UDP  Class"""
+    def __init__(self,command=None, # Gst_launch string
+                 # interval=1,
+                 # on_callback=None, # Callback function
+                 window_handle = None, # Window handle to display video
+                 loglevel:LogLevels=LogLevels.INFO,): # Debug flag
+
+        # self.on_callback = on_callback
+        # self.interval = interval
+        self.window_handle = window_handle
+
+        if command is None:
+            command = to_gst_string([
+                    'udpsrc port = 5000  caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96"' ,
+                    'rtph264depay ! decodebin ! videoconvert ! xvimagesink sync=false'
+
+                                 ])
+        super().__init__(command, loglevel=loglevel)
+        pass
+
+
+    def startup(self):
+        super().startup()
+        print('todo ???? Wait awhile for state change to playing')  # todo fixme
+        time.sleep(0.1)
+        print('Getting video dimensions')
+        appsrcs = self.get_by_cls(GstApp.AppSrc)
+        # pad = self.src.get_static_pad("src")
+        # cap = pad.get_current_caps()
+        # if cap:
+        #     struct = cap.get_structure(0)
+        #     self.video_width = struct.get_int("width")[1]
+        #     self.video_height = struct.get_int("height")[1]
+
+    #     self._thread = threading.Thread(target=self._launch_pipeline)
+    #     self._thread.start()
+    #     return self
+
+    def _on_pipeline_init(self):
+        """Sets additional properties for plugins in Pipeline"""
+
+        super()._on_pipeline_init()
+        if not self.has_element('xvimagesink'):
+            self.log.warning(f'No xvimagesink in pipeline')
+        if not self.has_element('videobox'):
+            self.log.warning(f'No videobox in pipeline')
+
+        appsrcs = self.get_by_cls(GstApp.AppSrc)
+        # self._src = appsrcs[0] if len(appsrcs) == 1 else None
+        # if not self._src:
+        #     # TODO: force pipeline to have appsink
+        #     raise AttributeError("%s not found", GstApp.AppSrc)
+        # self.videobox = self. get_by_name('videobox')
+
+        self.bus.enable_sync_message_emission()
+        self.bus.connect('sync-message::element', self.on_sync_message)
+
+    def on_sync_message(self, bus, msg):
+        self.log.debug("Gstreamer.%s: on_sync_message: %s", self, msg)
+        pass
+        if msg.get_structure().get_name() == 'prepare-window-handle':
+            self.log.debug('prepare-window-handle')
+            msg.src.set_window_handle(self.window_handle)
+            # msg.src.set_window_handle(self.windowId)
+
+    # def shutdown(self, timeout=1, eos=False):
+    #     self._end_stream_event.set()
+    #     # self.pipe.pipeline.send_event(Gst.Event.new_eos())
+    #     self._thread.join(timeout=1)
+    #     super().shutdown(timeout=timeout, eos=eos)
+
+class GstPipes:
+    """Class to start a list of Gstreamer pipelines"""
+    def __init__(self, pipes: typ.List, loglevel: LogLevels = LogLevels.INFO):
+        self.pipes = pipes
+        for pipe in self.pipes:
+            pipe.log.setLevel(int(loglevel))
+
+    def __str__(self) -> str:
+        return self.__class__.__name__
+
+    def __repr__(self) -> str:
+        return "<{}>".format(self)
+
+    def __enter__(self):
+        for pipe in self.pipes:
+            pipe.startup()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for pipe in self.pipes:
+            pipe.shutdown()
