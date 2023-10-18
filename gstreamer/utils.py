@@ -73,7 +73,17 @@ def fstringify(s, **kwargs):
     """Converts string to f-string
         print( fstringify('video/x-raw,width={width},height={height}', height=480, width=640) )
     """
-    return eval(f"f{s!r}", kwargs)
+    return eval(f"f{s!r}", kwargs) # !r calling __repr__ method of s
+
+def format_pipeline(**kwargs):
+    """Converts string to f-string, but ensures that kwargs['pipeline'] exists
+    _dict = {'pipeline'='video/x-raw,width={width},height={height}, width=640, height=480 }'
+    pipeline = fstringify_pipe(**_dict )"""
+    try:
+        pipeline = kwargs['pipeline']
+    except KeyError:
+        raise RuntimeError(f"KeyError: 'pipeline' not found in kwargs" ) # raise error if 'pipeline' not found in kwargs
+    return fstringify(to_gst_string(pipeline), **kwargs)
 
 
 def gst_state_to_str(state: Gst.State) -> str:
