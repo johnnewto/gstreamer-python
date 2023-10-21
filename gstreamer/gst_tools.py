@@ -224,11 +224,7 @@ class GstPipeline:
 
         self._end_stream_event.clear()
 
-        self.log.debug(
-            "%s Setting pipeline state to %s ... ",
-            self,
-            gst_state_to_str(Gst.State.PLAYING),
-        )
+        self.log.debug("%s Setting pipeline state to %s ... ", self, gst_state_to_str(Gst.State.PLAYING), )
         self._pipeline.set_state(Gst.State.PLAYING)
         self.log.debug(
             "%s Pipeline state set to %s ", self, gst_state_to_str(Gst.State.PLAYING)
@@ -246,6 +242,17 @@ class GstPipeline:
     @property
     def pipeline(self) -> Gst.Pipeline:
         return self._pipeline
+
+    def pause(self) -> None:
+        """Pause pipeline"""
+        if self._pipeline:
+            self._pipeline.set_state(Gst.State.PAUSED)
+
+    def play(self) -> None:
+        """Resume pipeline"""
+        if self._pipeline:
+            self._pipeline.set_state(Gst.State.PLAYING)
+
 
     def _shutdown_pipeline(self, timeout: int = 1, eos: bool = False) -> None:
         """ Stops pipeline
@@ -416,6 +423,7 @@ class GstVideoSink(GstPipeline):
         # find src element
         appsrcs = self.get_by_cls(GstApp.AppSrc)
         self._src = appsrcs[0] if len(appsrcs) == 1 else None
+        self.log.info(f" {self.__class__.__name__}: Found {self._src}")
         if not self._src:
             raise ValueError("%s not found", GstApp.AppSrc)
 
@@ -1077,11 +1085,18 @@ class GstPipes:
     def __repr__(self) -> str:
         return "<{}>".format(self)
 
-    def __enter__(self):
+    def startup(self):
         for pipe in self.pipes:
             pipe.startup()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def shutdown(self):
         for pipe in self.pipes:
             pipe.shutdown()
+
+    def __enter__(self):
+        self.startup()
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
