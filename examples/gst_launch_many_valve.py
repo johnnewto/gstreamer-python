@@ -1,7 +1,7 @@
 import time
 from random import randint
 
-from gstreamer import GstPipeline, GstContext, GstVidSrcValve
+from gstreamer import GstVideoSource, GstContext
 import gstreamer.utils as utils
 NUM_PIPELINES = 5
 DEFAULT_PIPELINES = [[
@@ -28,7 +28,7 @@ log.info('Starting')
 
 if __name__ == '__main__':
     with GstContext():
-        pipelines = [GstVidSrcValve(DEFAULT_PIPELINES[i], leaky=True) for i in range(5)]
+        pipelines = [GstVideoSource(DEFAULT_PIPELINES[i], leaky=True) for i in range(5)]
             # "videotestsrc num-buffers={} ! gtksink".format(randint(50, 100))) for _ in range(5)]
 
         for p in pipelines:

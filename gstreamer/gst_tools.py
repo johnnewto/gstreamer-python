@@ -75,6 +75,7 @@ class LogLevels():
 class GstContext:
     """ Gstreamer Main Loop Context  GLib.MainLoop.new running in separate thread
      It is needed for pipeline bus messages handling"""
+
     def __init__(self, loglevel: typ.Union[LogLevels, int] = LogLevels.INFO):
         # SIGINT handle issue:
         # https://github.com/beetbox/audioread/issues/63#issuecomment-390394735
@@ -143,6 +144,7 @@ class GstPipeline:
 
         self._log = logging.getLogger("pygst.{}".format(self.__class__.__name__))
         self._log.setLevel(int(loglevel))
+        self._dropstate = None
 
         self._end_stream_event = threading.Event()
 
@@ -253,7 +255,27 @@ class GstPipeline:
         if self._pipeline:
             self._pipeline.set_state(Gst.State.PLAYING)
 
+    def set_valve_state(self, valve_name: str,  # Name of the valve in the pipeline
+                        dropstate: bool):  # True = drop, False = pass
+        """ Set the state of a valve in the pipeline"""
+        try:
+            valve = self.pipeline.get_by_name(valve_name)
+            valve.set_property("drop", dropstate)
+            self._dropstate = dropstate
+            self.log.debug(f'Valve "{valve_name}" state set to {dropstate}')
+        except:
+            self.log.error(f'Valve "{valve_name}" not found in pipeline "{self.pipeline.get_name()}"')
 
+    def get_valve_state(self, valve_name: str):  # Name of the valve in the pipeline
+        """ Get the state of a valve in the pipeline"""
+        try:
+            valve = self.pipeline.get_by_name(valve_name)
+            return valve.get_property("drop")
+        except:
+            self.log.error(f'Valve "{valve_name}" not found in pipeline "{self.pipeline.get_name()}"')
+            return None
+
+        # valve = self.pipeline.get_by_name(valve_name)
     def _shutdown_pipeline(self, timeout: int = 1, eos: bool = False) -> None:
         """ Stops pipeline
         :param eos: if True -> send EOS event
@@ -700,33 +722,6 @@ class GstVideoSource(GstPipeline):
         self._clean_queue(self._queue)
 
 
-class GstVidSrcValve(GstVideoSource):
-    """
-    GstVideoSourceValve is a wrapper around a GStreamer pipeline that provides get and set methods for valve states.
-    """
-
-    def set_valve_state(self, valve_name: str,  # Name of the valve in the pipeline
-                        dropstate: bool):  # True = drop, False = pass
-        """ Set the state of a valve in the pipeline"""
-        try:
-            valve = self.pipeline.get_by_name(valve_name)
-            valve.set_property("drop", dropstate)
-            self.dropstate = dropstate
-            self.log.debug(f'Valve {valve_name} state set to {dropstate}')
-        except:
-            self.log.error(f'Valve {valve_name} not found in pipeline')
-
-    def get_valve_state(self, valve_name: str):  # Name of the valve in the pipeline
-        """ Get the state of a valve in the pipeline"""
-        try:
-            valve = self.pipeline.get_by_name(valve_name)
-            return valve.get_property("drop")
-        except:
-            self.log.error(f'Valve {valve_name} not found in pipeline')
-            return None
-        # valve = self.pipeline.get_by_name(valve_name)
-
-
 class GstVideoSave(GstPipeline):
     """Gstreamer Video Save Class"""
 
@@ -901,10 +896,10 @@ class GstJpegEnc(GstVideoSource):
 
 
 class GstStreamUDP(GstPipeline):
-    """Gstreamer H264, H265  stream UDP  Class"""
+    """Gstreamer H264, H265  stream UDP  Class with a on_callback function called periodically from an internal thread"""
 
     def __init__(self, command=None,  # Gst_launch string
-                 interval=1,
+                 interval=1,  # Interval in seconds to call on_callback
                  on_callback=None,  # Callback function
                  loglevel: typ.Union[LogLevels, int] = LogLevels.INFO):  # Debug flag
 
@@ -942,11 +937,10 @@ class GstStreamUDP(GstPipeline):
         """Sets additional properties for plugins in Pipeline"""
 
         super()._on_pipeline_init()
-        if not self.has_element('intervideosrc'):
+        if not self.has_element('intervideosrc') and not self.has_element('interpipesrc'):
             self.log.warning(f'No intervideosrc in pipeline')
 
     def _launch_pipeline(self):
-        # self._end_jpeg_capture_event.clear()
         elapsed_time = 0
         while not self.is_done and not self._end_stream_event.is_set():
             if elapsed_time > self.interval:
@@ -960,7 +954,6 @@ class GstStreamUDP(GstPipeline):
 
     def shutdown(self, timeout=1, eos=False):
         self._end_stream_event.set()
-        # self.pipe.pipeline.send_event(Gst.Event.new_eos())
         self._thread.join(timeout=1)
         super().shutdown(timeout=timeout, eos=eos)
 
@@ -1096,7 +1089,6 @@ class GstPipes:
 
     def __enter__(self):
         self.startup()
-
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.shutdown()

@@ -1,12 +1,10 @@
 
 import time
-import os
-import logging
-# os.environ["GST_PYTHON_LOG_LEVEL"] = "logging.DEBUG"
 
-from gstreamer import GstContext, GstPipeline, GstVideoSource, GstVidSrcValve, GstVideoSink, GstApp, Gst, GstVideo
 import gstreamer.utils as utils
+from gstreamer import GstPipeline, GstVideoSource
 
+# os.environ["GST_PYTHON_LOG_LEVEL"] = "logging.DEBUG"
 
 
 SRC_PIPELINE = utils.to_gst_string([
@@ -42,7 +40,7 @@ print(SINK_PIPELINE)
 
 num_buffers = 40
 with GstPipeline(SINK_PIPELINE) as rcv_pipeline:
-    with GstVidSrcValve(SRC_PIPELINE, leaky=True) as pipeline:
+    with GstVideoSource(SRC_PIPELINE, leaky=True) as pipeline:
         buffers = []
         count = 0
         dropstate = False
