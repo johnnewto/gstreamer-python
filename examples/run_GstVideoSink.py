@@ -1,18 +1,10 @@
-
-import os
 import time
-import math
 import typing as typ
-from random import randint
-from fractions import Fraction
 
 import numpy as np
-import pytest
 
-from gstreamer import GstVideo, Gst
 import gstreamer as gst
-import gstreamer.utils as utils
-
+from gstreamer import GstVideo
 
 NUM_BUFFERS = 10
 WIDTH, HEIGHT = 1920, 1080

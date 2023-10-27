@@ -131,10 +131,12 @@ def gst_buffer_with_caps_to_ndarray(buffer: Gst.Buffer, caps: Gst.Caps, do_copy:
     video_format = gst_video_format_from_string(structure.get_value('format'))
 
     channels = get_num_channels(video_format)
+    # channels = 3 if channels < 0 else channels  # TODO JN added this line to fix bug with channels = -1
 
     dtype = get_np_dtype(video_format)  # np.dtype
 
     format_info = GstVideo.VideoFormat.get_info(video_format)  # GstVideo.VideoFormatInfo
+    # print(width, height, channels, dtype, format_info.bits, do_copy)
 
     return gst_buffer_to_ndarray(buffer, width=width, height=height, channels=channels,
                                  dtype=dtype, bpp=format_info.bits, do_copy=do_copy)

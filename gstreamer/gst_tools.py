@@ -644,6 +644,7 @@ class GstVideoSource(GstPipeline):
             # TODO: force pipeline to have appsink
             raise AttributeError("%s not found", GstApp.AppSink)
 
+            # TODO jn ENSURE video_frmt: GstVideo.VideoFormat = GstVideo.VideoFormat.RGB,  # gst specific (RGB, BGR, RGBA)
         # Listen to 'new-sample' event
         # https://lazka.github.io/pgi-docs/GstApp-1.0/classes/AppSink.html#GstApp.AppSink.signals.new_sample
         if self._sink:
@@ -669,7 +670,10 @@ class GstVideoSource(GstPipeline):
             return None
 
         array = gst_buffer_with_caps_to_ndarray(buffer, caps, do_copy=True)
+        if len(array.shape) < 3:
+            self.log.error(f'{self} Invalid array shape: {array.shape}, perhaps add "capsfilter caps=video/x-raw,format=RGB" to pipeline')
 
+        # print(array.shape)
         return GstBuffer(
             data=array,
             pts=buffer.pts,
@@ -698,7 +702,7 @@ class GstVideoSource(GstPipeline):
         return Gst.FlowReturn.ERROR
 
     def pop(self, timeout: float = 0.1) -> typ.Optional[GstBuffer]:
-        """ Pops GstBuffer """
+        """ Pops GstBuffer , waits for timeout seconds"""
         if not self._sink:
             raise RuntimeError("Sink {} is not initialized".format(Gst.AppSink))
 
@@ -710,6 +714,16 @@ class GstVideoSource(GstPipeline):
                 pass
 
         return buffer
+
+    def get_nowait(self) -> typ.Optional[GstBuffer]:
+        """ Pops GstBuffer without waiting if empty """
+        if not self._sink:
+            raise RuntimeError("Sink {} is not initialized".format(Gst.AppSink))
+        try:
+            return self._queue.get_nowait()
+        except queue.Empty:
+            return None
+
 
     @property
     def queue_size(self) -> int:
