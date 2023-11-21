@@ -707,11 +707,12 @@ class GstVideoSource(GstPipeline):
             raise RuntimeError("Sink {} is not initialized".format(Gst.AppSink))
 
         buffer = None
-        while (self.is_active or not self._queue.empty()) and not buffer:
-            try:
-                buffer = self._queue.get(timeout=timeout)
-            except queue.Empty:
-                pass
+        #
+        # while (self.is_active or not self._queue.empty()) and not buffer:   this was not doing timeout properly
+        try:
+            buffer = self._queue.get(timeout=timeout)
+        except queue.Empty:
+            pass
 
         return buffer
 

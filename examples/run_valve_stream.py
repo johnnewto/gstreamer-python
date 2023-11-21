@@ -8,16 +8,24 @@ from gstreamer import GstPipeline, GstVideoSource
 
 
 SRC_PIPELINE = utils.to_gst_string([
-            'videotestsrc pattern=ball flip=true is-live=true num-buffers=1000 ! video/x-raw,framerate=10/1 !  tee name=t',
+            'v4l2src device=/dev/video0',
+            'video/x-raw,format=YUY2,width=640,height=480,framerate=15/1',
+            'videoscale ! video/x-raw,width=1280,height=720 ! tee name=t',
+            # 'videotestsrc pattern=ball is-live=true num-buffers=1000 ! video/x-raw,framerate=10/1 !  tee name=t',
             't.',
-            'queue leaky=2 ! valve name=myvalve drop=False ! video/x-raw,format=I420,width=640,height=480',
+            'queue ! xvimagesink sync=false',
+            't.',
+            'queue leaky=2 ! valve name=myvalve drop=False',
+            # 'videoconvert ! video/x-raw,width=640,height=480',
             # 'textoverlay text="Frame: " valignment=top halignment=left shaded-background=true',
             # 'timeoverlay valignment=top halignment=right shaded-background=true',
 
-            'videoconvert',
+            'videoconvert !  video/x-raw,format=I420,width=1280,height=720',
             # 'x264enc tune=zerolatency noise-reduction=10000 bitrate=2048 speed-preset=superfast',
-            'x264enc tune=zerolatency',
-            'rtph264pay ! udpsink host=127.0.0.1 port=5000',
+            'x264enc name=encoder tune=zerolatency bitrate=2048',
+            'rtph264pay ! udpsink host=10.42.0.147 port=5000',
+            # 'rtph264pay ! udpsink host=127.0.0.1 port=5000',
+
             't.',
             'queue leaky=2 ! videoconvert ! videorate drop-only=true ! video/x-raw,framerate=5/1,format=(string)BGR',
             'videoconvert ! appsink name=mysink emit-signals=true  sync=false async=false  max-buffers=2 drop=true ',
@@ -38,24 +46,33 @@ print(SINK_PIPELINE)
 #         while not pipeline.is_done:
 #             time.sleep(.1)
 
-num_buffers = 40
+num_buffers = 400
 with GstPipeline(SINK_PIPELINE) as rcv_pipeline:  # this will show the video on fpsdisplaysink
     with GstVideoSource(SRC_PIPELINE, leaky=True) as pipeline:
 
         buffers = []
         count = 0
         dropstate = False
+        last_time = time.time()
+        bitrate = 2000
         while len(buffers) < num_buffers:
             time.sleep(0.1)
             count += 1
-            if count % 10 == 0:
-                print(f'Count = : {count}')
-                dropstate = not dropstate
-                pipeline.set_valve_state("myvalve", dropstate)
+            # if count % 10 == 0:
+            #     print(f'Count = : {count}')
+            #     dropstate = not dropstate
+            #     pipeline.set_valve_state("myvalve", dropstate)
                 # if dropstate:
                 #     pipeline._pipeline.set_state(Gst.State.PLAYING)
                 # else:
                 #     pipeline._pipeline.set_state(Gst.State.PAUSED)
+            # if time > 5 seconds
+            if time.time() - last_time > 5:
+                last_time = time.time()
+                encoder = pipeline.get_by_name("encoder")
+                bitrate = 4000 if bitrate == 2000 else 2000
+                encoder.set_property("bitrate", bitrate)
+
 
             buffer = pipeline.pop()
             # print(f'Got buffer: {count = }')
