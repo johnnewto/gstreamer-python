@@ -5,7 +5,7 @@ import threading
 from gstreamer import GstVideoSource, GstVideoSink, GstVideo, Gst, GLib, GstContext
 
 WIDTH, HEIGHT, CHANNELS = 640, 480, 3
-NUM_BUFFERS = 1000
+NUM_BUFFERS = 10000
 VIDEO_FORMAT = GstVideo.VideoFormat.RGB
 
 video_format_str = GstVideo.VideoFormat.to_string(VIDEO_FORMAT)

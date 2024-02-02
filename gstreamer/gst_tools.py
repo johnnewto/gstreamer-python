@@ -601,7 +601,8 @@ class GstVideoSource(GstPipeline):
 
     def __init__(self, command: str,  # Gst_launch string
                  leaky: bool = False,  # If True -> use LeakyQueue
-                 max_buffers_size: int = 100,  # Max queue size
+                 max_buffers_size: int = 100,  # Max queue size,
+                 call_back = None,
                  loglevel: typ.Union[LogLevels, int] = LogLevels.INFO):  # debug flags
         """
         :param command: gst-launch-1.0 command (last element: appsink)
@@ -609,10 +610,45 @@ class GstVideoSource(GstPipeline):
         super(GstVideoSource, self).__init__(command, loglevel=loglevel)
 
         self._sink = None  # GstApp.AppSink
+        self.call_back = call_back
         self._counter = 0  # counts number of received buffers
 
         queue_cls = partial(LeakyQueue, on_drop=self._on_drop) if leaky else queue.Queue
         self._queue = queue_cls(maxsize=max_buffers_size)  # Queue of GstBuffer
+
+    def startup(self):
+        super().startup()
+        if self.call_back:
+            self._thread = threading.Thread(target=self._app_thread)
+            self._thread.start()
+        return self
+
+
+    def _app_thread(self):
+        # self._end_jpeg_capture_event.clear()
+        self._start_tracking_thread_is_done = False
+        while not self.is_done and not self._end_stream_event.is_set():
+            buffer = self.get_nowait()
+            if not buffer:
+                pass
+                # self.log.warning("No buffer")
+            else:
+                self.call_back(buffer)
+                # self.log.info(f"Got buffer: {buffer.data.shape = } {buffer.pts = } {buffer.dts = }")
+                # run tracker, send frame
+            time.sleep(0.01)
+
+        self.log.info('Sending EOS event')
+        self.pipeline.send_event(Gst.Event.new_eos())
+
+        # self.log.info(f'Waiting for pipeline to shutdown {self._end_stream_event.is_set() = }')
+        while self.is_active:
+            self.log.info('Waiting for pipeline to shutdown')
+            time.sleep(.1)
+
+        # self.log.info(f'Waiting for pipeline to shutdown {self.is_active = }')
+        # self.log.info(f'Waiting for pipeline to shutdown {self.is_done = }')
+
 
     @property
     def total_buffers_count(self) -> int:
@@ -735,6 +771,7 @@ class GstVideoSource(GstPipeline):
         super().shutdown(timeout=timeout, eos=eos)
 
         self._clean_queue(self._queue)
+
 
 
 class GstVideoSave(GstPipeline):
