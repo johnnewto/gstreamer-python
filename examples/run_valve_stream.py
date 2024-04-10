@@ -9,7 +9,8 @@ from gstreamer import GstPipeline, GstVideoSource
 
 SRC_PIPELINE = utils.to_gst_string([
             'v4l2src device=/dev/video0',
-            'video/x-raw,format=YUY2,width=640,height=480,framerate=15/1',
+            'video/x-raw,format=YUY2,width=640,height=480,framerate=30/1',
+            'timeoverlay valignment=top halignment=left shaded-background=true ',
             'videoscale ! video/x-raw,width=1280,height=720 ! tee name=t',
             # 'videotestsrc pattern=ball is-live=true num-buffers=1000 ! video/x-raw,framerate=10/1 !  tee name=t',
             't.',
@@ -23,8 +24,8 @@ SRC_PIPELINE = utils.to_gst_string([
             'videoconvert !  video/x-raw,format=I420,width=1280,height=720',
             # 'x264enc tune=zerolatency noise-reduction=10000 bitrate=2048 speed-preset=superfast',
             'x264enc name=encoder tune=zerolatency bitrate=2048',
-            'rtph264pay ! udpsink host=10.42.0.147 port=5000',
-            # 'rtph264pay ! udpsink host=127.0.0.1 port=5000',
+            # 'rtph264pay ! udpsink host=10.42.0.147 port=5000',
+            'rtph264pay ! udpsink host=127.0.0.1 port=5000',
 
             't.',
             'queue leaky=2 ! videoconvert ! videorate drop-only=true ! video/x-raw,framerate=5/1,format=(string)BGR',
@@ -67,11 +68,11 @@ with GstPipeline(SINK_PIPELINE) as rcv_pipeline:  # this will show the video on 
                 # else:
                 #     pipeline._pipeline.set_state(Gst.State.PAUSED)
             # if time > 5 seconds
-            if time.time() - last_time > 5:
-                last_time = time.time()
-                encoder = pipeline.get_by_name("encoder")
-                bitrate = 4000 if bitrate == 2000 else 2000
-                encoder.set_property("bitrate", bitrate)
+            # if time.time() - last_time > 5:
+            #     last_time = time.time()
+            #     encoder = pipeline.get_by_name("encoder")
+            #     bitrate = 4000 if bitrate == 2000 else 2000
+            #     encoder.set_property("bitrate", bitrate)
 
 
             buffer = pipeline.pop()

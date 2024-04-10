@@ -24,6 +24,7 @@ import queue
 import logging
 import threading
 import typing as typ
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
 
@@ -35,7 +36,8 @@ import gi
 gi.require_version("Gst", "1.0")
 gi.require_version("GstApp", "1.0")
 gi.require_version("GstVideo", "1.0")
-from gi.repository import Gst, GLib, GObject, GstApp, GstVideo  # noqa:F401,F402
+gi.require_version('GstRtp', '1.0')
+from gi.repository import Gst, GLib, GObject, GstApp, GstRtp, GstVideo  # noqa:F401,F402
 
 from .utils import *  # noqa:F401,F402
 
@@ -147,6 +149,7 @@ class GstPipeline:
         self._dropstate = None
 
         self._end_stream_event = threading.Event()
+        self.last_rtp_time = 0  # time that the last rtp packet was sent or received
 
     @property
     def log(self) -> logging.Logger:
@@ -218,6 +221,17 @@ class GstPipeline:
         self.bus.connect("message::eos", self.on_eos)
         self.bus.connect("message::warning", self.on_warning)
 
+        # Retrieve the payloader element by its name
+        payloader = self._pipeline.get_by_name("payloader")
+        if payloader:
+            # Connect the 'on_packet_sent' callback to a signal. The specific signal depends on the element.
+            # For demonstration, we're using a generic signal name 'new-sample' or 'new-buffer'.
+            # Replace this with the actual signal for when a packet is sent, which might vary based on the element or library.
+            # payloader.connect("new-buffer", self.on_packet_sent, None)
+            print("Payloader found")
+            src_pad = payloader.get_static_pad("src")
+            src_pad.add_probe(Gst.PadProbeType.BUFFER, self.payloader_callback, None)
+
         # Initalize Pipeline
         self._on_pipeline_init()
         self._pipeline.set_state(Gst.State.READY)
@@ -236,6 +250,20 @@ class GstPipeline:
     def _on_pipeline_init(self) -> None:
         """Sets additional properties for plugins in Pipeline"""
         pass
+
+    # Callback function for when a packet is sent if
+
+    def payloader_callback(self, pad, info, user_data):
+        """
+        Callback function that will be called for each packet passing through the rtp pad.
+        """
+
+        # Access the buffer (RTP packet) here
+        # buffer = info.get_buffer()
+        self.last_rtp_time =  time.time()
+        self.last_buffer = info.get_buffer()
+        # print(f"Packet intercepted! { self.last_rtp_time = }")
+        return Gst.PadProbeReturn.OK
 
     @property
     def bus(self) -> Gst.Bus:
@@ -569,6 +597,28 @@ class LeakyQueue(queue.Queue):
     def dropped(self):
         return self._dropped
 
+class CallbackHandler:
+    """
+    Encapsulate callbacks with id and name
+    """
+    def __init__(self, id :int | None = None, name: str | None = None, callback: typ.Callable = None):
+        self.id = id
+        self.name = name
+        self.callback = callback 
+
+    def set_callback(self, callback):
+        """Set the callback function."""
+        if callable(callback):
+            self.callback = callback
+        else:
+            raise ValueError("Callback must be callable")
+
+    def trigger_callback(self, *args, **kwargs):
+        """Trigger the callback if it is set."""
+        if self.callback is not None:
+            self.callback(self, *args, **kwargs)
+        else:
+            print("Callback is not set.")
 
 # Struct copies fields from Gst.Buffer
 # https://lazka.github.io/pgi-docs/Gst-1.0/classes/Buffer.html
@@ -579,6 +629,8 @@ class GstBuffer:
     dts = attr.ib(default=GLib.MAXUINT64)  # type: int
     offset = attr.ib(default=GLib.MAXUINT64)  # type: int
     duration = attr.ib(default=GLib.MAXUINT64)  # type: int
+
+
 
 
 class GstVideoSource(GstPipeline):
@@ -602,7 +654,7 @@ class GstVideoSource(GstPipeline):
     def __init__(self, command: str,  # Gst_launch string
                  leaky: bool = False,  # If True -> use LeakyQueue
                  max_buffers_size: int = 100,  # Max queue size,
-                 call_back = None,
+                 callback_handler : CallbackHandler | None = None,
                  loglevel: typ.Union[LogLevels, int] = LogLevels.INFO):  # debug flags
         """
         :param command: gst-launch-1.0 command (last element: appsink)
@@ -610,17 +662,42 @@ class GstVideoSource(GstPipeline):
         super(GstVideoSource, self).__init__(command, loglevel=loglevel)
 
         self._sink = None  # GstApp.AppSink
-        self.call_back = call_back
+        # self.callback_handler = callback_handler
+        self.callback_handler= callback_handler
         self._counter = 0  # counts number of received buffers
 
         queue_cls = partial(LeakyQueue, on_drop=self._on_drop) if leaky else queue.Queue
         self._queue = queue_cls(maxsize=max_buffers_size)  # Queue of GstBuffer
 
+
+
+    # # Callback function for new RTP packets
+    # def on_new_rtp_packet(self, pad, info):
+    #     buffer = info.get_buffer()
+    #     if buffer:
+    #         # Map the buffer as an RTP packet
+    #         rtp_buffer = GstRtp.RTPBuffer()
+    #         print(rtp_buffer)
+    #         success = rtp_buffer.map(buffer, Gst.MapFlags.READ)
+    #         if success:
+    #             # Now, access the sequence number directly
+    #             # seqnum = rtp_buffer.seqnum
+    #             # print(f"RTP Packet Sequence Number: {seqnum}")
+    #             rtp_buffer.unmap()
+    #     return Gst.PadProbeReturn.OK
+
     def startup(self):
         super().startup()
-        if self.call_back:
+        if self.callback_handler:
             self._thread = threading.Thread(target=self._app_thread)
             self._thread.start()
+
+        # # Get the sink pad of the rtpjitterbuffer element
+        # rtpjitterbuffer = self.pipeline.get_by_name("rtpjitterbuffer0")
+        # sink_pad = rtpjitterbuffer.get_static_pad("sink")
+        #
+        # # Add a pad probe to the sink pad to intercept RTP packets
+        # sink_pad.add_probe(Gst.PadProbeType.BUFFER, self.on_new_rtp_packet)
         return self
 
 
@@ -633,7 +710,7 @@ class GstVideoSource(GstPipeline):
                 pass
                 # self.log.warning("No buffer")
             else:
-                self.call_back(buffer)
+                self.callback_handler.callback(self.callback_handler.id, self.callback_handler.name, buffer)
                 # self.log.info(f"Got buffer: {buffer.data.shape = } {buffer.pts = } {buffer.dts = }")
                 # run tracker, send frame
             time.sleep(0.01)
@@ -693,6 +770,8 @@ class GstVideoSource(GstPipeline):
             https://lazka.github.io/pgi-docs/Gst-1.0/classes/Sample.html
         """
         buffer = sample.get_buffer()
+        # self._last_buffer = buffer  # testcode
+
         caps = sample.get_caps()
 
         cnt = buffer.n_memory()
@@ -981,9 +1060,25 @@ class GstStreamUDP(GstPipeline):
 
     def startup(self):
         super().startup()
+
+        # Add a probe to the source pad of rtph264pay to log timestamps
+        rtph264pay = self.pipeline.get_by_name("rtph264pay0")
+        if rtph264pay:
+            srcpad = rtph264pay.get_static_pad("src")
+            srcpad.add_probe(Gst.PadProbeType.BUFFER, self.buffer_probe, None)
+
+
         self._thread = threading.Thread(target=self._launch_pipeline)
         self._thread.start()
         return self
+
+    def buffer_probe(self, pad, info, user_data):
+        buffer = info.get_buffer()
+        # Assuming buffer timestamp is in nanoseconds, convert to seconds for readability
+        timestamp_ns = buffer.pts
+        timestamp_s = timestamp_ns / Gst.SECOND if timestamp_ns != Gst.CLOCK_TIME_NONE else None
+        # print(f"Buffer PTS (in seconds): {timestamp_s}")
+        return Gst.PadProbeReturn.OK
 
     def _on_pipeline_init(self):
         """Sets additional properties for plugins in Pipeline"""

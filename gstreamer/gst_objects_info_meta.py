@@ -3,6 +3,7 @@ from ctypes import *
 from typing import List
 
 import gi
+
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst  # noqa:F401,F402
 

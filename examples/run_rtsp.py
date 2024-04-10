@@ -247,7 +247,8 @@ class GstServer():
         # pipeline
         # Launch test buffers streaming
         pipeline = utils.to_gst_string([
-            "videotestsrc num-buffers=1000",
+            # "videotestsrc num-buffers=1000",
+            "videotestsrc ",
             "video/x-raw,format={fmt},width={width},height={height}".format(fmt=VIDEO_FORMAT,
                                                                             width=WIDTH,
                                                                             height=HEIGHT),

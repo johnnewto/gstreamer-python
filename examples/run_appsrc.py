@@ -9,6 +9,8 @@ from fractions import Fraction
 import numpy as np
 
 from gstreamer import GstContext, GstPipeline, GstApp, Gst, GstVideo, GLib, GstVideoSink
+from gstreamer.gst_objects_info_meta import gst_meta_write, gst_meta_get, gst_meta_remove, to_gst_objects_info
+
 import gstreamer.utils as utils
 
 VIDEO_FORMAT = "RGB"
@@ -84,6 +86,28 @@ DTYPE = utils.get_np_dtype(GST_VIDEO_FORMAT)
 
 FPS_STR = fraction_to_str(FPS)
 CAPS = "video/x-raw,format={VIDEO_FORMAT},width={WIDTH},height={HEIGHT},framerate={FPS_STR}".format(**locals())
+track0 = {'bounding_box': (100, 100, 200, 200), 'confidence': 0.9, 'class_name': 'person', 'track_id': 0}
+track1 = {'bounding_box': (200, 200, 300, 300), 'confidence': 0.9, 'class_name': 'person', 'track_id': 1}
+to_gst_objects_info([track0, track1])
+
+def on_new_packet(pad, info):
+    buffer = info.get_buffer()
+    if buffer:
+        print(buffer)
+        gst_meta_write(buffer, [track0])
+        print(gst_meta_get(buffer))
+
+        # # Map the buffer as an RTP packet to access its sequence number
+        # (tf, rtp_buffer) = GstRtp.RTPBuffer.map(buffer, Gst.MapFlags.READ)
+        # # rtp_buffer = GstRtp.RTPBuffer(buffer, Gst.MapFlags.READ)
+        # print(rtp_buffer)
+        # if tf:
+        #     seqnum = rtp_buffer.get_seq()
+        #     get_timestamp = rtp_buffer.get_timestamp() / 100000
+        #     print(f"RTP Packet Sequence Number: {seqnum}, Timestamp: {get_timestamp}")
+        #     print(rtp_buffer)
+        #     rtp_buffer.unmap()
+    return Gst.PadProbeReturn.OK
 
 with GstContext():  # create GstContext (hides MainLoop)
 
@@ -106,8 +130,16 @@ with GstContext():  # create GstContext (hides MainLoop)
     # override on_pipeline_init to set specific properties before launching pipeline
     pipeline._on_pipeline_init = on_pipeline_init.__get__(pipeline)
 
+
+
     try:
         pipeline.startup()
+
+        videoconvert = pipeline.pipeline.get_by_name("videoconvert0")
+        sink_pad = videoconvert.get_static_pad("sink")
+        # Add a pad probe to the sink pad to intercept RTP packets
+        sink_pad.add_probe(Gst.PadProbeType.BUFFER, on_new_packet)
+
         appsrc = pipeline.get_by_cls(GstApp.AppSrc)[0]  # GstApp.AppSrc
 
         pts = 0  # buffers presentation timestamp
