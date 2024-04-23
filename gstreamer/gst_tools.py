@@ -211,7 +211,12 @@ class GstPipeline:
         if self._pipeline:
             raise RuntimeError("Can't initiate %s. Already started")
 
-        self._pipeline = Gst.parse_launch(self._command)
+        try:
+            self._pipeline = Gst.parse_launch(self._command)
+        except Exception as err:
+            self.log.error("Gstreamer.%s: %s", self, err)
+            self.log.error(self._command)
+            return self
 
         # Initialize Bus
         self._bus = self._pipeline.get_bus()
@@ -601,7 +606,7 @@ class CallbackHandler:
     """
     Encapsulate callbacks with id and name
     """
-    def __init__(self, id :int | None = None, name: str | None = None, callback: typ.Callable = None):
+    def __init__(self, id :typ.Union[int, None] = None, name: typ.Union[str, None] = None, callback: typ.Callable = None):
         self.id = id
         self.name = name
         self.callback = callback 
@@ -654,7 +659,7 @@ class GstVideoSource(GstPipeline):
     def __init__(self, command: str,  # Gst_launch string
                  leaky: bool = False,  # If True -> use LeakyQueue
                  max_buffers_size: int = 100,  # Max queue size,
-                 callback_handler : CallbackHandler | None = None,
+                 callback_handler : typ.Union[CallbackHandler, None] = None,
                  loglevel: typ.Union[LogLevels, int] = LogLevels.INFO):  # debug flags
         """
         :param command: gst-launch-1.0 command (last element: appsink)

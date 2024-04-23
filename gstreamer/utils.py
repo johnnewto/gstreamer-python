@@ -175,8 +175,8 @@ def to_gst_string(plugins: typ.List[str]) -> str:
 
     plugins_ = flatten_list(plugins)
 
-    # <!> between plugins (except tee)
-    return plugins_[0] + "".join(["{} {}".format('' if pl[-1] == '.' else ' !', pl) for pl in plugins_[1:]])
+    # <!> between plugins (except tee,  i.e.  starts with t.)
+    return plugins_[0] + "".join(["{} {}".format('' if pl[:2] == 't.' else ' !', pl) for pl in plugins_[1:]])
 
 
 def set_gst_debug_level(level:Gst.DebugLevel = Gst.DebugLevel.FIXME):
