@@ -184,3 +184,14 @@ def set_gst_debug_level(level:Gst.DebugLevel = Gst.DebugLevel.FIXME):
     # Setting it to 5 will print all gstreamer debug information.
     Gst.debug_set_active(False) if level == Gst.DebugLevel.NONE else Gst.debug_set_active(True)
     Gst.debug_set_default_threshold(level)
+
+
+def print_elements(pipeline, element_name):
+    """list all elements in pipeline"""
+    it = pipeline.iterate_elements()
+    while True:
+        result = it.next()
+        if result != Gst.IteratorResult.OK:
+            break
+        print(element_name)
+

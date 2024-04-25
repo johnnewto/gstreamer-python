@@ -27,12 +27,13 @@ Usage:
 import time
 import gstreamer.utils as utils
 from gstreamer import GstPipeline, GstContext, LogLevels
+from gi.repository import Gst
 
 # os.environ["GST_PYTHON_LOG_LEVEL"] = "logging.DEBUG"
 
 
 SRC1_PIPELINE = utils.to_gst_string([
-            'videotestsrc  is-live=true num-buffers=300 ! video/x-raw,framerate=20/1',
+            'videotestsrc pattern=ball is-live=true num-buffers=300 ! video/x-raw,framerate=10/1',
             'tee name=t',
             't. ! queue',
             'fpsdisplaysink',
@@ -41,12 +42,14 @@ SRC1_PIPELINE = utils.to_gst_string([
         ])
 
 SRC2_PIPELINE = utils.to_gst_string([
-            'interpipesrc name=cam_0 listen-to=cam_0 is-live=true format=time',
+            'interpipesrc listen-to=cam_0 is-live=true format=time',
             'queue',
             'fpsdisplaysink '
+            
         ])
 
 print(SRC1_PIPELINE)
+
 
 
 num_buffers = 40
@@ -54,17 +57,22 @@ with GstContext():
 # if True:
     with GstPipeline(SRC1_PIPELINE, loglevel=LogLevels.DEBUG) as pipeline1:
         with GstPipeline(SRC2_PIPELINE, loglevel=LogLevels.DEBUG) as pipeline2:
+
             count = 0
             while pipeline1.is_active:
                 count = count + 1
                 if count % 10 == 0:
                     print(f'Count = : {count}')
                     # set interpipe listen-to property to " " to drop frames
-                    if pipeline2.get_by_name("cam_0").get_property("listen-to") == "cam_0":
-                        pipeline2.get_by_name("cam_0").set_property("listen-to", " ")
+                    if pipeline2.get_by_name("interpipesrc0") is not None:
+                        print(f'cam_0: {pipeline2.get_by_name("cam_0")}')
+
+                    # src = find_element(pipeline2.pipeline, "interpipesrc")
+                    if pipeline2.get_by_name("interpipesrc0").get_property("listen-to") == "cam_0":
+                        pipeline2.get_by_name("interpipesrc0").set_property("listen-to", " ")
                         print("pause frames")
                     else:
-                        pipeline2.get_by_name("cam_0").set_property("listen-to", "cam_0")
+                        pipeline2.get_by_name("interpipesrc0").set_property("listen-to", "cam_0")
                         print("resume frames")
         
                 time.sleep(.1)
