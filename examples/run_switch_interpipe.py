@@ -25,14 +25,14 @@ Usage:
 """
 
 import time
-import gstreamer.utils as utils
+import gstreamer.utils as gst_utils
 from gstreamer import GstPipeline, GstContext, LogLevels
 from gi.repository import Gst
 
 # os.environ["GST_PYTHON_LOG_LEVEL"] = "logging.DEBUG"
 
 
-SRC1_PIPELINE = utils.to_gst_string([
+SRC1_PIPELINE = gst_utils.to_gst_string([
             'videotestsrc pattern=ball is-live=true num-buffers=300 ! video/x-raw,framerate=10/1',
             'tee name=t',
             't. ! queue',
@@ -41,7 +41,7 @@ SRC1_PIPELINE = utils.to_gst_string([
             'interpipesink name=cam_0 ',
         ])
 
-SRC2_PIPELINE = utils.to_gst_string([
+SRC2_PIPELINE = gst_utils.to_gst_string([
             'interpipesrc listen-to=cam_0 is-live=true format=time',
             'queue',
             'fpsdisplaysink '
@@ -67,13 +67,14 @@ with GstContext():
                     if pipeline2.get_by_name("interpipesrc0") is not None:
                         print(f'cam_0: {pipeline2.get_by_name("cam_0")}')
 
-                    # src = find_element(pipeline2.pipeline, "interpipesrc")
-                    if pipeline2.get_by_name("interpipesrc0").get_property("listen-to") == "cam_0":
-                        pipeline2.get_by_name("interpipesrc0").set_property("listen-to", " ")
-                        print("pause frames")
-                    else:
-                        pipeline2.get_by_name("interpipesrc0").set_property("listen-to", "cam_0")
-                        print("resume frames")
+                    pipesrc = gst_utils.find_element(pipeline2.pipeline, "interpipesrc")
+                    if pipesrc is not None:
+                        if  pipesrc.get_property("listen-to") == "cam_0":
+                            pipesrc.set_property("listen-to", " ")
+                            print("pause frames")
+                        else:
+                            pipesrc.set_property("listen-to", "cam_0")
+                            print("resume frames")
         
                 time.sleep(.1)
 

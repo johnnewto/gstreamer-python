@@ -186,12 +186,22 @@ def set_gst_debug_level(level:Gst.DebugLevel = Gst.DebugLevel.FIXME):
     Gst.debug_set_default_threshold(level)
 
 
-def print_elements(pipeline, element_name):
+def print_elements(pipeline):
     """list all elements in pipeline"""
     it = pipeline.iterate_elements()
     while True:
-        result = it.next()
+        result, element = it.next()
         if result != Gst.IteratorResult.OK:
             break
-        print(element_name)
+        print(element.get_name())
 
+def find_element(pipeline, element_name):
+    """find element in pipeline,  ignores last number in name i.e. interpipesrc0 -> interpipesrc"""
+    it = pipeline.iterate_elements()
+    while True:
+        result, element = it.next()
+        if result != Gst.IteratorResult.OK:
+            break
+        if element_name in element.get_name():
+            return element
+    return None
