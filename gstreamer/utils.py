@@ -34,6 +34,9 @@ def _get_num_channels(fmt: GstVideo.VideoFormat) -> int:
     # temporal fix
     if fmt == GstVideo.VideoFormat.BGRX:
         return 4
+        
+    if fmt == GstVideo.VideoFormat.RGBX:   # JN added May 7 2024
+        return 4
     
     if has_flag(frmt_info.flags, GstVideo.VideoFormatFlags.ALPHA):
         return 4

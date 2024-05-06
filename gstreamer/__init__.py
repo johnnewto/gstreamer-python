@@ -12,5 +12,5 @@ from .gst_hacks import map_gst_buffer, map_gst_memory  # noqa:F401,F402
 from .utils import gst_buffer_to_ndarray, gst_buffer_with_pad_to_ndarray, ndarray_to_gst_buffer  # noqa:F401,F402
 
 from .gst_tools import LogLevels, GstVideoSink, GstVideoSource, GstPipeline, GstContext, GstVideoSave, GstJpegEnc, GstStreamUDP, GstXvimageSink, GstPipes, CallbackHandler  # noqa:F401,F402
-
+from .gst_tools import LeakyQueue, GstBuffer
 setup_logging(verbose=get_log_level())
