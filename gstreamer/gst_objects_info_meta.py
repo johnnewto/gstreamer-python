@@ -7,16 +7,15 @@ import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst  # noqa:F401,F402
 
-
+    
 class GstObjectInfo(Structure):
-    _fields_ = [("x", c_int),
-                ("y", c_int),
-                ("width", c_int),
-                ("height", c_int),
+    _fields_ = [("x", c_float),
+                ("y", c_float),
+                ("width", c_float),
+                ("height", c_float),
                 ("confidence", c_float),
                 ("class_name", c_char_p),
                 ("track_id", c_int)]
-
 
 class GstObjectInfoArray(Structure):
     _fields_ = [("items", POINTER(GstObjectInfo)),
